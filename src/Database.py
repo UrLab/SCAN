@@ -1,3 +1,6 @@
+from Exceptions import UserNotFound, ProductCodeNotFound, ProductNotFound
+
+
 class Database():
 	def __init__(self, config):
 		self.__logger = config.getLogger()
@@ -10,14 +13,19 @@ class Database():
 		try:
 			return float(self.getInfo(self.__userbase_file, username))
 		except ValueError:
-			self.addUser(username)
-			return 0
+			raise UserNotFound
 
 	def getName(self, product_code):
-		return self.getInfo(self.__codebase_file, product_code)
+		try:
+			return self.getInfo(self.__codebase_file, product_code)
+		except ValueError:
+			raise ProductCodeNotFound
 
 	def getPrice(self, product_name):
-		return float(self.getInfo(self.__productbase_file, product_name))
+		try:
+			return float(self.getInfo(self.__productbase_file, product_name))
+		except ValueError:
+			raise ProductNotFound
 
 	def getInfo(self, db_file, filter_):
 		with open(db_file, 'r') as database:
@@ -42,12 +50,28 @@ class Database():
 
 		self.logUser(id_, username)
 
-	def writeTransaction(self, username, product, price, balance, new_balance):
+	def updateBalance(self, username, new_balance):
+		with open(self.__userbase_file, 'r') as database:
+			lines = database.readlines()
+		for l in range(len(lines)):
+			line = lines[l]
+			line = line[:-1].split(",")
+			if line[1] == username:
+				lines[l] = f"{line[0]},{username},{new_balance}\n"
+				break
+		with open(self.__userbase_file, 'w') as database:
+			for line in lines:
+				database.write(line)
+
+	def writeTransactionToFile(self, username, product, price, balance, new_balance):
 		with open(self.__transactionbase_file, 'a') as database:
 			id_ = self.getLastId(self.__transactionbase_file) + 1
 			database.write(f"{id_},{username},{product},{price},{balance},{new_balance}\n")
-
 		self.logTransaction(username, product, price, balance, new_balance, id_)
+
+	def writeTransaction(self, username, product, price, balance, new_balance):
+		self.updateBalance(username, new_balance)
+		self.writeTransactionToFile(username, product, price, balance, new_balance)
 
 	def logUser(self, id_, username):
 		self.__logger.write(f"[DATABASE] : Added user '{id_}' '{username}'")
